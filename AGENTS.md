@@ -1,13 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getWeeklyState, setWeeklyState } from "@/lib/weekly";
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
 
-export async function GET() {
-  const state = await getWeeklyState();
-  return NextResponse.json(state);
-}
-
-export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const saved = await setWeeklyState(body);
-  return NextResponse.json(saved);
-}
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->
