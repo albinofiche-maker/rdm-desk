@@ -1,0 +1,31 @@
+//@version=6
+indicator("RDM — MNQ Feed (webhook)", overlay=true)
+
+// Script leve e separado do FODA v4: a única função dele é mandar o OHLC de
+// cada vela fechada para o webhook do site (/api/bars), para o gráfico
+// lightweight-charts ter dados reais do MNQ (o mesmo que vês no TradingView
+// Premium), em vez do proxy OANDA:NAS100USD.
+//
+// CONFIGURAÇÃO DO ALERTA (TradingView):
+//   1. Aplica este indicador ao gráfico MNQ (contrato que segues, ex: MNQ1! ou MNQU2026).
+//   2. Cria um alerta -> Condition: "RDM — MNQ Feed (webhook)" -> escolhe
+//      "Any alert() function call" (não "feedBar" — este script usa alert()
+//      diretamente, não alertcondition, porque a mensagem tem de ser dinâmica).
+//   3. Trigger: não precisas de escolher "Once Per Bar Close" aqui — o script já
+//      só dispara uma vez por vela fechada (alert.freq_once_per_bar_close).
+//   4. Webhook URL: https://jolador.netlify.app/api/bars
+//   5. Message: deixa o campo por omissão (o texto enviado é sempre o que o
+//      script constrói via alert(), independentemente do que estiver na caixa).
+
+secretInput = input.string("", "Webhook secret (opcional, tem de bater certo com WEBHOOK_SECRET no Netlify)", group = "Webhook")
+symbolLabel = input.string("MNQ", "Símbolo a enviar no payload", group = "Webhook")
+tfLabel     = input.string("5",   "Timeframe a enviar no payload (string, ex: 1/5/15)", group = "Webhook")
+
+// Placeholder visual só para não ficar um indicador sem nenhum plot.
+plot(close, title = "close (referência, não usado no payload)", display = display.none)
+
+if barstate.isconfirmed
+    msg = '{"secret":"' + secretInput + '","symbol":"' + symbolLabel + '","timeframe":"' + tfLabel +
+     '","time":' + str.tostring(time) + ',"open":' + str.tostring(open) + ',"high":' + str.tostring(high) +
+     ',"low":' + str.tostring(low) + ',"close":' + str.tostring(close) + ',"volume":' + str.tostring(volume) + '}'
+    alert(msg, alert.freq_once_per_bar_close)
