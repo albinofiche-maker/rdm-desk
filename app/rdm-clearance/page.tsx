@@ -4,6 +4,26 @@ import "./rdm.css";
 import { GateId } from "@/lib/store";
 import { computeDay, defaultWeeklyState, WeeklyState } from "@/lib/weekly";
 
+// O "dia de trading" começa às 18:00 NY (abertura da sessão de Asia) e vai até
+// às 18:00 NY seguinte. Um evento pertence ao mesmo dia de trading que "agora"
+// se caírem na mesma janela — assim os sweeps de Asia/London resetam sozinhos
+// quando a sessão seguinte começa, em vez de uma janela rolante de 24h.
+function tradingDayKey(ms: number): string {
+  const nyStr = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(ms));
+  const get = (t: string) => Number(nyStr.find((p) => p.type === t)?.value);
+  const y = get("year"), mo = get("month"), d = get("day"), h = get("hour");
+  // se já passou das 18h, este momento pertence ao dia de trading de amanhã
+  const day = h >= 18 ? d + 1 : d;
+  return `${y}-${mo}-${day}`;
+}
+
 type Dir = "long" | "short";
 
 interface GateDef {
@@ -290,7 +310,7 @@ export default function RdmClearancePage() {
             title="London swept Asia high AND low?"
             hint="Se sim → no trade. Se não → verde."
             status={
-              liveState.londonSweptBothAsia && Date.now() - liveState.londonSweptBothAsia.ts < 24 * 60 * 60 * 1000
+              liveState.londonSweptBothAsia && tradingDayKey(liveState.londonSweptBothAsia.ts) === tradingDayKey(Date.now())
                 ? "blocked"
                 : "clear"
             }
@@ -299,7 +319,7 @@ export default function RdmClearancePage() {
             title="NY premarket swept London H&L before 9:30?"
             hint="Se sim → no trade. Se não → verde."
             status={
-              liveState.nyPremarketClearedBothLondon && Date.now() - liveState.nyPremarketClearedBothLondon.ts < 24 * 60 * 60 * 1000
+              liveState.nyPremarketClearedBothLondon && tradingDayKey(liveState.nyPremarketClearedBothLondon.ts) === tradingDayKey(Date.now())
                 ? "blocked"
                 : "clear"
             }
