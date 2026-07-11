@@ -364,7 +364,7 @@ export default function HomePage() {
     <>
       {/* ===================== CHART ===================== */}
       <div id="chart" className="section-anchor">
-        <LWChart symbol="MNQ" timeframe="5" />
+        <LWChart symbol="MNQ" timeframe="1" />
       </div>
 
       {/* ===================== CHECKLIST ===================== */}
