@@ -1,0 +1,23 @@
+// ── WEBHOOK: enviar zona para o site (gráfico) ──
+grp_hook      = "WEBHOOK (site)"
+webhookSecret = input.string("", "Webhook secret", group=grp_hook)
+webhookSymbol = input.string("MNQ", "Símbolo enviado no payload", group=grp_hook)
+
+f_sendZone(session, zh, zl, zt) =>
+    if barstate.isconfirmed
+        msg = '{"secret":"' + webhookSecret + '","symbol":"' + webhookSymbol +
+             '","session":"' + session + '","high":' + str.tostring(zh) +
+             ',"low":' + str.tostring(zl) + ',"time":' + str.tostring(zt) +
+             ',"daysShow":' + str.tostring(days_show) + '}'
+        alert(msg, alert.freq_once_per_bar_close)
+
+// junto a cada createZone(...) no bloco EXECUÇÃO:
+// if ny_on
+//     createZone(...)
+//     if is_ny
+//         f_sendZone("ny", not na(ny_h) ? ny_h : high, not na(ny_l) ? ny_l : low, not na(ny_t) ? ny_t : time)
+//     ...
+// (mesmo padrão para lon_on/tok_on)
+//
+// Alerta no TradingView: Condition = este indicador, "Qualquer chamada de função de alerta()"
+// Trigger = "Once Per Bar Close", Webhook URL = https://jolador.netlify.app/api/zones
