@@ -47,7 +47,7 @@ interface GateDef {
 }
 
 const GATES: GateDef[] = [
-  { id: "powerhours", label: "Within Powerhours", hint: "A hora atual cai dentro da tua janela definida — senão, morto.", phase: 1 },
+  { id: "powerhours", label: "Trading Session", hint: "A hora atual cai dentro da tua janela definida (9:30/10:00, 14:00, 20:00 NY) — senão, morto.", phase: 1 },
   { id: "sweepLow", label: "Sellside swept FIRST (Asia/London/NY low)", hint: "O draw tem de ser tirado antes do SMT — nunca entres antes do sweep.", phase: 1, dir: "long", liveKey: "sweepLow" },
   { id: "sweepHigh", label: "Buyside swept FIRST (Asia/London/NY high)", hint: "O draw tem de ser tirado antes do SMT — nunca entres antes do sweep.", phase: 1, dir: "short", liveKey: "sweepHigh" },
   { id: "sunriseZone", label: "Ryze Zone", hint: "Só contam zonas destas 3 sessões — Dubai, Rio etc. não têm base, ignora.", phase: 1, liveKey: "zoneTouched" },
@@ -446,20 +446,26 @@ export default function HomePage() {
               <span className="t">{PHASE_LABEL[phaseNum]}</span>
             </div>
             {visibleGates.filter((g) => g.phase === phaseNum).map((g) => {
-              const isChecked = !!checked[g.id];
+              const zoneInvalidatedToday =
+                g.id === "sunriseZone" &&
+                liveState.zoneInvalidated &&
+                tradingDayKey(liveState.zoneInvalidated.ts) === tradingDayKey(Date.now()) &&
+                (!liveState.zoneTouched || liveState.zoneInvalidated.ts > liveState.zoneTouched.ts);
+              const isChecked = !!checked[g.id] && !zoneInvalidatedToday;
               const live = g.liveKey && liveState[g.liveKey] && Date.now() - liveState[g.liveKey].ts < 2 * 60 * 60 * 1000;
               const isAuto = !!g.liveKey || g.id === "powerhours";
 
               if (isAuto) {
                 return (
                   <div key={g.id} className={"info-row auto-gate" + (g.optional ? " optional" : "")}>
-                    <span className={"dot " + (isChecked ? "clear" : "pending")}></span>
+                    <span className={"dot " + (isChecked ? "clear" : zoneInvalidatedToday ? "blocked" : "pending")}></span>
                     <span className="txtwrap">
                       <b>{g.label}</b>
                       <span className="hint">{g.hint}</span>
                     </span>
                     {g.tag && <span className="tag">{g.tag}</span>}
-                    {live && <span className="tag live">live</span>}
+                    {zoneInvalidatedToday && <span className="tag blocked">invalidada (fechou fora)</span>}
+                    {!zoneInvalidatedToday && live && <span className="tag live">live</span>}
                   </div>
                 );
               }
@@ -521,7 +527,7 @@ export default function HomePage() {
             <div className="field"><label>Cooldown após loss (min)</label><input type="number" min={0} value={cb.cfg.cooldown} onChange={(e) => setCb((p) => p && { ...p, cfg: { ...p.cfg, cooldown: Number(e.target.value) } })} /></div>
             <div className="field"><label>Risk:Reward (R)</label><input type="number" min={0.5} step={0.5} value={cb.cfg.rr} onChange={(e) => setCb((p) => p && { ...p, cfg: { ...p.cfg, rr: Number(e.target.value) } })} /></div>
             <div className="field"><label>€ por R (opcional)</label><input type="number" min={0} step={1} placeholder="ex: 100" value={cb.cfg.perr} onChange={(e) => setCb((p) => p && { ...p, cfg: { ...p.cfg, perr: e.target.value } })} /></div>
-            <div className="field"><label>Powerhours</label><input type="text" placeholder="ex: 15:30–18:00" value={cb.cfg.ph} onChange={(e) => setCb((p) => p && { ...p, cfg: { ...p.cfg, ph: e.target.value } })} /></div>
+            <div className="field"><label>Trading Session (nota)</label><input type="text" placeholder="ex: 9:30/10:00, 14:00, 20:00 NY" value={cb.cfg.ph} onChange={(e) => setCb((p) => p && { ...p, cfg: { ...p.cfg, ph: e.target.value } })} /></div>
             <p className="note">O circuit breaker fecha o dia ao atingires o máximo de trades ou o stop diário em −R. Depois de cada loss corre um cooldown pra bloquear revenge trades. Guardado neste browser, reseta automaticamente num novo dia.</p>
           </div>
         </details>
