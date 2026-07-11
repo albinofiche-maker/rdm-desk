@@ -1,15 +1,13 @@
 "use client";
-import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const LINKS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/weekly-outlook", label: "Weekly Outlook" },
-  { href: "/rdm-clearance", label: "RDM Clearance" },
+  { href: "#chart", label: "Chart" },
+  { href: "#checklist", label: "RDM Clearance" },
+  { href: "#semana", label: "Weekly Outlook" },
 ];
 
 export default function NavBar() {
-  const pathname = usePathname();
   const [clock, setClock] = useState("--:--:--");
   const [live, setLive] = useState(false);
 
@@ -59,7 +57,7 @@ export default function NavBar() {
       </div>
       <div className="links">
         {LINKS.map((l) => (
-          <a key={l.href} href={l.href} className={pathname === l.href ? "active" : ""}>
+          <a key={l.href} href={l.href}>
             {l.label}
           </a>
         ))}

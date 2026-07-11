@@ -1,0 +1,573 @@
+//@version=5
+indicator("FODA v4", overlay=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500)
+
+// ═══════════════════════════════════════════════════════════
+// 📥 INPUTS
+// ═══════════════════════════════════════════════════════════
+
+grp_ny       = "NEW YORK SETTINGS"
+ny_on        = input.bool(true,  "New York ■",                           group=grp_ny,  inline="ny_row")
+ny_color     = input.color(color.new(#2962FF, 15), "",                   group=grp_ny,  inline="ny_row")
+ny_txt_col   = input.color(color.new(#2962FF, 0),  "",                   group=grp_ny,  inline="ny_row")
+ny_brd_col   = input.color(color.new(#2962FF, 35), "",                   group=grp_ny,  inline="ny_row")
+ny_brd_w     = input.int(1, "Border", minval=1, maxval=5,                group=grp_ny)
+
+grp_lon      = "LONDON SETTINGS"
+lon_on       = input.bool(true,  "London ■",                             group=grp_lon, inline="lon_row")
+lon_color    = input.color(color.new(#F23645, 10), "",                   group=grp_lon, inline="lon_row")
+lon_txt_col  = input.color(color.new(#F23645, 0),  "",                   group=grp_lon, inline="lon_row")
+lon_brd_col  = input.color(color.new(#F23645, 35), "",                   group=grp_lon, inline="lon_row")
+lon_brd_w    = input.int(1, "Border", minval=1, maxval=5,                group=grp_lon)
+
+grp_tok      = "TOKYO SETTINGS"
+tok_on       = input.bool(true,  "Tokyo ■",                              group=grp_tok, inline="tok_row")
+tok_color    = input.color(color.new(#FFEB3B, 11), "",                   group=grp_tok, inline="tok_row")
+tok_txt_col  = input.color(color.new(#FFEB3B, 0),  "",                   group=grp_tok, inline="tok_row")
+tok_brd_col  = input.color(color.new(#FFEB3B, 35), "",                   group=grp_tok, inline="tok_row")
+tok_brd_w    = input.int(1, "Border", minval=1, maxval=5,                group=grp_tok)
+
+grp_zone_id  = "ZONE ID SETTINGS"
+show_num     = input.bool(true, "Text Size",                             group=grp_zone_id, inline="zid_row")
+txt_size     = input.string("Pequeno", "",
+     options=["Tiny","Pequeno","Normal","Grande","Huge"],                 group=grp_zone_id, inline="zid_row")
+txt_align    = input.string("Direita", "Text Align",
+     options=["Esquerda","Direita","Centro"],                             group=grp_zone_id)
+
+grp_rsmt     = "RSMT SETTINGS"
+rsmt_on      = input.bool(false, "RSMT",                                 group=grp_rsmt)
+transp       = input.int(80, "Transp", minval=0, maxval=100,             group=grp_rsmt)
+comp_on      = input.bool(false, "Comp. Ticker",                         group=grp_rsmt, inline="comp_row")
+comp_ticker  = input.symbol("CME_MINI:ES1!", "",                         group=grp_rsmt, inline="comp_row")
+max_circles  = input.int(10, "Max. Circles", minval=0, maxval=200,       group=grp_rsmt)
+circle_size  = input.string("Normal", "Circle Size",
+     options=["Tiny","Small","Normal","Large","Huge"],                    group=grp_rsmt)
+
+grp_gen      = "AUTOMATIC TIME SETTINGS"
+days_show    = input.int(15, "Chart Zones for Today's Date ↺", minval=1, maxval=30, group=grp_gen, inline="days_row")
+show_midline = input.bool(true, "Mid Line",                              group=grp_gen)
+
+grp_tbl      = "TABELA DE SESSOES"
+show_table   = input.bool(true, "Mostrar tabela",                        group=grp_tbl)
+tbl_pos      = input.string("Bottom Right", "Posicao",
+     options=["Bottom Right","Bottom Left","Top Right","Top Left"],       group=grp_tbl)
+tbl_txt_size = input.string("Small", "Tamanho do texto (tabela)",
+     options=["Tiny","Small","Normal","Large","Huge"],                    group=grp_tbl)
+
+// ═══════════════════════════════════════════════════════════
+// 🔧 HELPERS
+// ═══════════════════════════════════════════════════════════
+
+f_txtsize(s) =>
+    switch s
+        "Tiny"    => size.tiny
+        "Pequeno" => size.small
+        "Small"   => size.small
+        "Grande"  => size.large
+        "Large"   => size.large
+        "Huge"    => size.huge
+        => size.normal
+
+f_align(s) =>
+    switch s
+        "Esquerda" => label.style_label_right
+        "Centro"   => label.style_label_center
+        => label.style_label_left
+
+f_tblpos(s) =>
+    switch s
+        "Bottom Left" => position.bottom_left
+        "Top Right"   => position.top_right
+        "Top Left"    => position.top_left
+        => position.bottom_right
+
+// ── NOAA / Jean Meeus ──────────────────────────────────────
+f_sunrise_min(lat, lon) =>
+    day_ms  = time - time % 86400000
+    JD      = (day_ms / 86400000.0) + 2440587.5
+    T       = (JD - 2451545.0) / 36525.0
+    L0      = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360.0
+    M       = 357.52911 + T * (35999.05029 - 0.0001537 * T)
+    Mrad    = M * math.pi / 180.0
+    C       = math.sin(Mrad) * (1.914602 - T * (0.004817 + 0.000014 * T)) + math.sin(2.0 * Mrad) * (0.019993 - 0.000101 * T) + math.sin(3.0 * Mrad) * 0.000289
+    sunLon  = L0 + C
+    omega   = 125.04 - 1934.136 * T
+    lambda  = sunLon - 0.00569 - 0.00478 * math.sin(omega * math.pi / 180.0)
+    epsilon = 23.439291 - T * (0.013004 + T * (0.000164 - T * 0.000504))
+    epsilon += 0.00256 * math.cos(omega * math.pi / 180.0)
+    sinDec  = math.sin(epsilon * math.pi / 180.0) * math.sin(lambda * math.pi / 180.0)
+    cosDec  = math.cos(math.asin(sinDec))
+    cosH    = (math.cos(90.833 * math.pi / 180.0) - sinDec * math.sin(lat * math.pi / 180.0)) / (cosDec * math.cos(lat * math.pi / 180.0))
+    cosH   := math.max(-1.0, math.min(1.0, cosH))
+    H       = math.acos(cosH) * 180.0 / math.pi
+    y       = math.tan(epsilon / 2.0 * math.pi / 180.0)
+    y      *= y
+    L0rad   = L0 * math.pi / 180.0
+    eqTime  = 4.0 * (180.0 / math.pi) * (y * math.sin(2.0 * L0rad) - 2.0 * 0.016708634 * math.sin(Mrad) + 4.0 * 0.016708634 * y * math.sin(Mrad) * math.cos(2.0 * L0rad) - 0.5 * y * y * math.sin(4.0 * L0rad) - 1.25 * 0.016708634 * 0.016708634 * math.sin(2.0 * Mrad))
+    solarNoon  = 720.0 - 4.0 * lon - eqTime
+    sunriseMin = solarNoon - 4.0 * H
+    (sunriseMin % 1440.0 + 1440.0) % 1440.0
+
+// ═══════════════════════════════════════════════════════════
+// 🔍 DETECÇÃO — ticker actual
+// ═══════════════════════════════════════════════════════════
+
+tf_ms = timeframe.in_seconds() * 1000
+
+barContainsSunrise(sunrise_min) =>
+    day_ms    = time - time % 86400000
+    sr_ts     = day_ms + int(sunrise_min * 60000)
+    bar_end   = time + tf_ms
+    bar_end > sr_ts and time <= sr_ts
+
+tok_sr_min = f_sunrise_min(35.68,  139.69)
+lon_sr_min = f_sunrise_min(51.50,   -0.12)
+ny_sr_min  = f_sunrise_min(40.71,  -74.00)
+
+is_tok = barContainsSunrise(tok_sr_min)
+is_lon = barContainsSunrise(lon_sr_min)
+is_ny  = barContainsSunrise(ny_sr_min)
+
+get1mHL(lat, lon) =>
+    sr_min  = f_sunrise_min(lat, lon)
+    cur_min = hour(time, "UTC") * 60 + minute(time, "UTC")
+    in_win  = math.abs(cur_min - int(sr_min)) <= 0
+    var float h_cap = na
+    var float l_cap = na
+    var int   t_cap = na
+    if in_win and not in_win[1]
+        h_cap := high
+        l_cap := low
+        t_cap := time
+    [h_cap, l_cap, t_cap]
+
+[tok_h, tok_l, tok_t] = request.security(syminfo.tickerid, "1",
+     get1mHL(35.68, 139.69), barmerge.gaps_off, barmerge.lookahead_off)
+[lon_h, lon_l, lon_t] = request.security(syminfo.tickerid, "1",
+     get1mHL(51.50, -0.12),  barmerge.gaps_off, barmerge.lookahead_off)
+[ny_h,  ny_l,  ny_t]  = request.security(syminfo.tickerid, "1",
+     get1mHL(40.71, -74.00), barmerge.gaps_off, barmerge.lookahead_off)
+
+// ═══════════════════════════════════════════════════════════
+// 🔍 DETECÇÃO — comp ticker
+// ═══════════════════════════════════════════════════════════
+
+get1mHL_comp(lat, lon) =>
+    sr_min  = f_sunrise_min(lat, lon)
+    cur_min = hour(time, "UTC") * 60 + minute(time, "UTC")
+    in_win  = math.abs(cur_min - int(sr_min)) <= 0
+    var float h_cap = na
+    var float l_cap = na
+    var int   t_cap = na
+    if in_win and not in_win[1]
+        h_cap := high
+        l_cap := low
+        t_cap := time
+    [h_cap, l_cap, t_cap]
+
+[comp_ny_h,  comp_ny_l,  comp_ny_t]  = request.security(comp_ticker, "1",
+     get1mHL_comp(40.71, -74.00), barmerge.gaps_off, barmerge.lookahead_off)
+[comp_lon_h, comp_lon_l, comp_lon_t] = request.security(comp_ticker, "1",
+     get1mHL_comp(51.50, -0.12),  barmerge.gaps_off, barmerge.lookahead_off)
+[comp_tok_h, comp_tok_l, comp_tok_t] = request.security(comp_ticker, "1",
+     get1mHL_comp(35.68, 139.69), barmerge.gaps_off, barmerge.lookahead_off)
+
+[comp_high, comp_low, comp_open, comp_close] = request.security(comp_ticker, timeframe.period,
+     [high, low, open, close], barmerge.gaps_off, barmerge.lookahead_off)
+
+// ═══════════════════════════════════════════════════════════
+// 📦 ARRAYS — ticker actual
+// ═══════════════════════════════════════════════════════════
+
+var box[]   box_tok = array.new_box()
+var line[]  lin_tok = array.new_line()
+var label[] lbl_tok = array.new_label()
+var int[]   tim_tok = array.new_int()
+var float[] hi_tok  = array.new_float()
+var float[] lo_tok  = array.new_float()
+var int[]   tdn_tok = array.new_int()
+
+var box[]   box_lon = array.new_box()
+var line[]  lin_lon = array.new_line()
+var label[] lbl_lon = array.new_label()
+var int[]   tim_lon = array.new_int()
+var float[] hi_lon  = array.new_float()
+var float[] lo_lon  = array.new_float()
+var int[]   tdn_lon = array.new_int()
+
+var box[]   box_ny  = array.new_box()
+var line[]  lin_ny  = array.new_line()
+var label[] lbl_ny  = array.new_label()
+var int[]   tim_ny  = array.new_int()
+var float[] hi_ny   = array.new_float()
+var float[] lo_ny   = array.new_float()
+var int[]   tdn_ny  = array.new_int()
+
+// ═══════════════════════════════════════════════════════════
+// 📦 ARRAYS — comp ticker zonas
+// ═══════════════════════════════════════════════════════════
+
+var float[] comp_hi_ny_arr  = array.new_float()
+var float[] comp_lo_ny_arr  = array.new_float()
+var int[]   comp_t_ny_arr   = array.new_int()
+var float[] comp_hi_lon_arr = array.new_float()
+var float[] comp_lo_lon_arr = array.new_float()
+var int[]   comp_t_lon_arr  = array.new_int()
+var float[] comp_hi_tok_arr = array.new_float()
+var float[] comp_lo_tok_arr = array.new_float()
+var int[]   comp_t_tok_arr  = array.new_int()
+
+if comp_on
+    int last_t_ny  = array.size(comp_t_ny_arr)  > 0 ? array.get(comp_t_ny_arr,  array.size(comp_t_ny_arr)  - 1) : na
+    int last_t_lon = array.size(comp_t_lon_arr) > 0 ? array.get(comp_t_lon_arr, array.size(comp_t_lon_arr) - 1) : na
+    int last_t_tok = array.size(comp_t_tok_arr) > 0 ? array.get(comp_t_tok_arr, array.size(comp_t_tok_arr) - 1) : na
+
+    if not na(comp_ny_h) and (na(last_t_ny) or comp_ny_t != last_t_ny)
+        array.push(comp_hi_ny_arr, comp_ny_h)
+        array.push(comp_lo_ny_arr, comp_ny_l)
+        array.push(comp_t_ny_arr,  comp_ny_t)
+    if not na(comp_lon_h) and (na(last_t_lon) or comp_lon_t != last_t_lon)
+        array.push(comp_hi_lon_arr, comp_lon_h)
+        array.push(comp_lo_lon_arr, comp_lon_l)
+        array.push(comp_t_lon_arr,  comp_lon_t)
+    if not na(comp_tok_h) and (na(last_t_tok) or comp_tok_t != last_t_tok)
+        array.push(comp_hi_tok_arr, comp_tok_h)
+        array.push(comp_lo_tok_arr, comp_tok_l)
+        array.push(comp_t_tok_arr,  comp_tok_t)
+
+// ═══════════════════════════════════════════════════════════
+// 🏗️ CRIAÇÃO DE ZONAS
+// ═══════════════════════════════════════════════════════════
+
+createZone(isSig, zoneH, zoneL, zoneT, bArr, lArr, lblArr, tArr, hiArr, loArr, tdnArr,
+           clr, txtClr, brdClr, brdW) =>
+    zh = not na(zoneH) ? zoneH : high
+    zl = not na(zoneL) ? zoneL : low
+    zt = not na(zoneT) ? zoneT : time
+
+    if isSig
+        mid     = (zh + zl) / 2.0
+        t_left  = zt
+        t_right = t_left + math.max(tf_ms * 2, 120000)
+        num_txt = show_num ? "• 1 •" : ""
+
+        b = box.new(
+             left         = t_left,
+             top          = zh,
+             right        = t_right,
+             bottom       = zl,
+             border_color = brdClr,
+             border_width = brdW,
+             bgcolor      = clr,
+             extend       = extend.right,
+             xloc         = xloc.bar_time)
+
+        l = line.new(
+             x1     = t_left,
+             y1     = mid,
+             x2     = t_right,
+             y2     = mid,
+             color  = show_midline ? color.new(clr, 20) : color.new(clr, 100),
+             style  = line.style_dotted,
+             width  = 1,
+             extend = extend.right,
+             xloc   = xloc.bar_time)
+
+        lb = label.new(
+             x         = bar_index,
+             y         = mid,
+             text      = num_txt,
+             xloc      = xloc.bar_index,
+             yloc      = yloc.price,
+             style     = f_align(txt_align),
+             textcolor = txtClr,
+             size      = f_txtsize(txt_size),
+             color     = color.new(color.black, 100))
+
+        array.push(bArr,   b)
+        array.push(lArr,   l)
+        array.push(lblArr, lb)
+        array.push(tArr,   t_left)
+        array.push(hiArr,  zh)
+        array.push(loArr,  zl)
+        array.push(tdnArr, time)
+
+// ═══════════════════════════════════════════════════════════
+// 🔄 ACTUALIZAR LABELS
+// ═══════════════════════════════════════════════════════════
+
+updateLabels(lblArr, hiArr, loArr, tdnArr) =>
+    if array.size(lblArr) > 0
+        for i = 0 to array.size(lblArr) - 1
+            mid         = (array.get(hiArr, i) + array.get(loArr, i)) / 2.0
+            zone_day_ts = array.get(tdnArr, i) - array.get(tdnArr, i) % 86400000
+            today_ts    = timenow - timenow % 86400000
+            d_num       = int((today_ts - zone_day_ts) / 86400000) + 1
+            label.set_x(array.get(lblArr, i), bar_index + 2)
+            label.set_y(array.get(lblArr, i), mid)
+            label.set_style(array.get(lblArr, i), f_align(txt_align))
+            if show_num
+                label.set_text(array.get(lblArr, i), "• " + str.tostring(d_num) + " •")
+            else
+                label.set_text(array.get(lblArr, i), "")
+
+// ═══════════════════════════════════════════════════════════
+// 🗑️ REMOÇÃO DE ZONAS ANTIGAS
+// ═══════════════════════════════════════════════════════════
+
+removeOld(bArr, lArr, lblArr, tArr, hiArr, loArr, tdnArr) =>
+    max_ms = days_show * 86400000
+    i = array.size(tArr) - 1
+    while i >= 0
+        if timenow - array.get(tArr, i) > max_ms
+            box.delete(array.get(bArr, i))
+            line.delete(array.get(lArr, i))
+            label.delete(array.get(lblArr, i))
+            array.remove(bArr,   i)
+            array.remove(lArr,   i)
+            array.remove(lblArr, i)
+            array.remove(tArr,   i)
+            array.remove(hiArr,  i)
+            array.remove(loArr,  i)
+            array.remove(tdnArr, i)
+        i -= 1
+
+// ═══════════════════════════════════════════════════════════
+// 🚀 EXECUÇÃO
+// ═══════════════════════════════════════════════════════════
+
+if ny_on
+    createZone(is_ny, ny_h, ny_l, ny_t, box_ny, lin_ny, lbl_ny, tim_ny, hi_ny, lo_ny, tdn_ny,
+               ny_color, ny_txt_col, ny_brd_col, ny_brd_w)
+    removeOld(box_ny, lin_ny, lbl_ny, tim_ny, hi_ny, lo_ny, tdn_ny)
+    updateLabels(lbl_ny, hi_ny, lo_ny, tdn_ny)
+
+if lon_on
+    createZone(is_lon, lon_h, lon_l, lon_t, box_lon, lin_lon, lbl_lon, tim_lon, hi_lon, lo_lon, tdn_lon,
+               lon_color, lon_txt_col, lon_brd_col, lon_brd_w)
+    removeOld(box_lon, lin_lon, lbl_lon, tim_lon, hi_lon, lo_lon, tdn_lon)
+    updateLabels(lbl_lon, hi_lon, lo_lon, tdn_lon)
+
+if tok_on
+    createZone(is_tok, tok_h, tok_l, tok_t, box_tok, lin_tok, lbl_tok, tim_tok, hi_tok, lo_tok, tdn_tok,
+               tok_color, tok_txt_col, tok_brd_col, tok_brd_w)
+    removeOld(box_tok, lin_tok, lbl_tok, tim_tok, hi_tok, lo_tok, tdn_tok)
+    updateLabels(lbl_tok, hi_tok, lo_tok, tdn_tok)
+
+// ═══════════════════════════════════════════════════════════
+// 🔔 ALERTAS
+// ═══════════════════════════════════════════════════════════
+
+body_hi = math.max(open, close)
+body_lo = math.min(open, close)
+
+var float last_hi_tok = na
+var float last_lo_tok = na
+var float last_hi_lon = na
+var float last_lo_lon = na
+var float last_hi_ny  = na
+var float last_lo_ny  = na
+
+if array.size(hi_tok) > 0
+    last_hi_tok := array.get(hi_tok, array.size(hi_tok) - 1)
+    last_lo_tok := array.get(lo_tok, array.size(lo_tok) - 1)
+if array.size(hi_lon) > 0
+    last_hi_lon := array.get(hi_lon, array.size(hi_lon) - 1)
+    last_lo_lon := array.get(lo_lon, array.size(lo_lon) - 1)
+if array.size(hi_ny) > 0
+    last_hi_ny  := array.get(hi_ny,  array.size(hi_ny)  - 1)
+    last_lo_ny  := array.get(lo_ny,  array.size(lo_ny)  - 1)
+
+alert_tok_top = tok_on and not na(last_hi_tok) and body_hi > last_hi_tok and low  <= last_hi_tok
+alert_tok_bot = tok_on and not na(last_lo_tok) and body_lo < last_lo_tok and high >= last_lo_tok
+alert_lon_top = lon_on and not na(last_hi_lon) and body_hi > last_hi_lon and low  <= last_hi_lon
+alert_lon_bot = lon_on and not na(last_lo_lon) and body_lo < last_lo_lon and high >= last_lo_lon
+alert_ny_top  = ny_on  and not na(last_hi_ny)  and body_hi > last_hi_ny  and low  <= last_hi_ny
+alert_ny_bot  = ny_on  and not na(last_lo_ny)  and body_lo < last_lo_ny  and high >= last_lo_ny
+
+alertcondition(alert_tok_top, "Tokyo — Rejeicao Topo",     "FODA: Rejeicao no topo da zona Tokyo")
+alertcondition(alert_tok_bot, "Tokyo — Rejeicao Fundo",    "FODA: Rejeicao no fundo da zona Tokyo")
+alertcondition(alert_lon_top, "London — Rejeicao Topo",    "FODA: Rejeicao no topo da zona London")
+alertcondition(alert_lon_bot, "London — Rejeicao Fundo",   "FODA: Rejeicao no fundo da zona London")
+alertcondition(alert_ny_top,  "New York — Rejeicao Topo",  "FODA: Rejeicao no topo da zona New York")
+alertcondition(alert_ny_bot,  "New York — Rejeicao Fundo", "FODA: Rejeicao no fundo da zona New York")
+alertcondition(alert_tok_top or alert_tok_bot or alert_lon_top or alert_lon_bot or alert_ny_top or alert_ny_bot,
+     "Qualquer Rejeicao", "FODA: Rejeicao numa zona de sessao")
+
+// ═══════════════════════════════════════════════════════════
+// ⛔ INVALIDAÇÃO POR FECHO
+// Regra do utilizador: um pavio que sai e volta NÃO invalida a zona —
+// só invalida se uma candle FECHAR fora dela. Reseta quando nasce zona nova.
+// ═══════════════════════════════════════════════════════════
+
+var bool inv_tok = false
+var bool inv_lon = false
+var bool inv_ny  = false
+
+if is_tok
+    inv_tok := false
+if is_lon
+    inv_lon := false
+if is_ny
+    inv_ny := false
+
+invalidate_tok_top = tok_on and not na(last_hi_tok) and not inv_tok and close > last_hi_tok
+invalidate_tok_bot = tok_on and not na(last_lo_tok) and not inv_tok and close < last_lo_tok
+invalidate_lon_top = lon_on and not na(last_hi_lon) and not inv_lon and close > last_hi_lon
+invalidate_lon_bot = lon_on and not na(last_lo_lon) and not inv_lon and close < last_lo_lon
+invalidate_ny_top  = ny_on  and not na(last_hi_ny)  and not inv_ny  and close > last_hi_ny
+invalidate_ny_bot  = ny_on  and not na(last_lo_ny)  and not inv_ny  and close < last_lo_ny
+
+if invalidate_tok_top or invalidate_tok_bot
+    inv_tok := true
+if invalidate_lon_top or invalidate_lon_bot
+    inv_lon := true
+if invalidate_ny_top or invalidate_ny_bot
+    inv_ny := true
+
+alertcondition(invalidate_tok_top or invalidate_tok_bot, "Tokyo — Zona Invalidada (fecho)",     "FODA: Fecho fora da zona Tokyo — zona invalidada")
+alertcondition(invalidate_lon_top or invalidate_lon_bot, "London — Zona Invalidada (fecho)",    "FODA: Fecho fora da zona London — zona invalidada")
+alertcondition(invalidate_ny_top  or invalidate_ny_bot,  "New York — Zona Invalidada (fecho)",  "FODA: Fecho fora da zona New York — zona invalidada")
+alertcondition(invalidate_tok_top or invalidate_tok_bot or invalidate_lon_top or invalidate_lon_bot or invalidate_ny_top or invalidate_ny_bot,
+     "Qualquer Zona Invalidada (fecho)", "FODA: Fecho fora de uma zona de sessao — invalidacao")
+
+// ═══════════════════════════════════════════════════════════
+// ⭕ TOUCH CIRCLES — ticker actual
+// ═══════════════════════════════════════════════════════════
+
+var label[] circ_tok   = array.new_label()
+var int[]   circ_tok_t = array.new_int()
+var label[] circ_lon   = array.new_label()
+var int[]   circ_lon_t = array.new_int()
+var label[] circ_ny    = array.new_label()
+var int[]   circ_ny_t  = array.new_int()
+
+removeOldCircles(lblArr, tArr) =>
+    while array.size(tArr) > 0 and (max_circles == 0 or array.size(tArr) > max_circles)
+        label.delete(array.get(lblArr, 0))
+        array.remove(lblArr, 0)
+        array.remove(tArr,   0)
+
+checkTouches(hiArr, loArr, zTArr, clr, circArr, circTArr) =>
+    if max_circles > 0 and array.size(hiArr) > 0
+        for i = 0 to array.size(hiArr) - 1
+            zh = array.get(hiArr, i)
+            zl = array.get(loArr, i)
+            zt = array.get(zTArr, i)
+            if time > zt
+                body_top = math.max(open, close)
+                body_bot = math.min(open, close)
+                reject_bot = body_top < zl and high >= zl
+                reject_top = body_bot > zh and low <= zh
+                if reject_top
+                    lb = label.new(
+                         x     = bar_index, y = zh, text = "",
+                         xloc  = xloc.bar_index, yloc = yloc.price,
+                         style = label.style_circle,
+                         color = color.new(clr, transp),
+                         size  = f_txtsize(circle_size))
+                    array.push(circArr,  lb)
+                    array.push(circTArr, time)
+                if reject_bot
+                    lb = label.new(
+                         x     = bar_index, y = zl, text = "",
+                         xloc  = xloc.bar_index, yloc = yloc.price,
+                         style = label.style_circle,
+                         color = color.new(clr, transp),
+                         size  = f_txtsize(circle_size))
+                    array.push(circArr,  lb)
+                    array.push(circTArr, time)
+
+if rsmt_on
+    if ny_on
+        checkTouches(hi_ny, lo_ny, tim_ny, ny_color, circ_ny, circ_ny_t)
+        removeOldCircles(circ_ny, circ_ny_t)
+    if lon_on
+        checkTouches(hi_lon, lo_lon, tim_lon, lon_color, circ_lon, circ_lon_t)
+        removeOldCircles(circ_lon, circ_lon_t)
+    if tok_on
+        checkTouches(hi_tok, lo_tok, tim_tok, tok_color, circ_tok, circ_tok_t)
+        removeOldCircles(circ_tok, circ_tok_t)
+
+// ═══════════════════════════════════════════════════════════
+// 🔗 COMP. TICKER — círculos no NQ quando ES toca zona
+// ═══════════════════════════════════════════════════════════
+
+var label[] circ_comp   = array.new_label()
+var int[]   circ_comp_t = array.new_int()
+
+checkCompTouches(compHiArr, compLoArr, compTArr, clr) =>
+    if comp_on and max_circles > 0 and array.size(compHiArr) > 0
+        for i = 0 to array.size(compHiArr) - 1
+            zh = array.get(compHiArr, i)
+            zl = array.get(compLoArr, i)
+            zt = array.get(compTArr,  i)
+            if time > zt
+                comp_body_top = math.max(comp_open, comp_close)
+                comp_body_bot = math.min(comp_open, comp_close)
+                comp_rej_top = comp_body_bot > zh and comp_low  <= zh
+                comp_rej_bot = comp_body_top < zl and comp_high >= zl
+                if comp_rej_top or comp_rej_bot
+                    lb = label.new(
+                         x     = bar_index, y = close, text = "",
+                         xloc  = xloc.bar_index, yloc = yloc.price,
+                         style = label.style_circle,
+                         color = color.new(clr, transp),
+                         size  = f_txtsize(circle_size))
+                    array.push(circ_comp,   lb)
+                    array.push(circ_comp_t, time)
+
+if comp_on
+    if ny_on
+        checkCompTouches(comp_hi_ny_arr, comp_lo_ny_arr, comp_t_ny_arr, ny_color)
+    if lon_on
+        checkCompTouches(comp_hi_lon_arr, comp_lo_lon_arr, comp_t_lon_arr, lon_color)
+    if tok_on
+        checkCompTouches(comp_hi_tok_arr, comp_lo_tok_arr, comp_t_tok_arr, tok_color)
+    removeOldCircles(circ_comp, circ_comp_t)
+
+// ═══════════════════════════════════════════════════════════
+// 📊 TABELA
+// ═══════════════════════════════════════════════════════════
+
+tblFillCol(tbl, col, nm, clr, hiArr, loArr, ts) =>
+    bg  = color.new(color.black, 60)
+    hd  = color.new(color.black, 40)
+    n   = array.size(hiArr)
+    hi  = n > 0 ? array.get(hiArr, n - 1) : na
+    lo  = n > 0 ? array.get(loArr, n - 1) : na
+    rng = not na(hi) and not na(lo) ? hi - lo : na
+    table.cell(tbl, col, 0, nm,                                                     text_color=clr, text_size=ts, bgcolor=hd)
+    table.cell(tbl, col, 1, not na(hi)  ? str.tostring(hi,  format.mintick) : "—", text_color=clr, text_size=ts, bgcolor=bg)
+    table.cell(tbl, col, 2, not na(lo)  ? str.tostring(lo,  format.mintick) : "—", text_color=clr, text_size=ts, bgcolor=bg)
+    table.cell(tbl, col, 3, not na(rng) ? str.tostring(rng, format.mintick) : "—", text_color=clr, text_size=ts, bgcolor=bg)
+
+var table sess_tbl = na
+
+if show_table and barstate.islast
+    if not na(sess_tbl)
+        table.delete(sess_tbl)
+    n_cols   = (ny_on ? 1 : 0) + (lon_on ? 1 : 0) + (tok_on ? 1 : 0)
+    ts       = f_txtsize(tbl_txt_size)
+    bg       = color.new(color.black, 60)
+    hd       = color.new(color.black, 40)
+    sess_tbl := table.new(
+         position     = f_tblpos(tbl_pos),
+         columns      = n_cols + 1,
+         rows         = 4,
+         bgcolor      = color.new(color.black, 20),
+         border_color = color.new(color.gray, 60),
+         border_width = 1)
+    table.cell(sess_tbl, 0, 0, "",      text_color=color.gray, text_size=ts, bgcolor=hd)
+    table.cell(sess_tbl, 0, 1, "High",  text_color=color.gray, text_size=ts, bgcolor=bg)
+    table.cell(sess_tbl, 0, 2, "Low",   text_color=color.gray, text_size=ts, bgcolor=bg)
+    table.cell(sess_tbl, 0, 3, "Range", text_color=color.gray, text_size=ts, bgcolor=bg)
+    col = 1
+    if ny_on
+        tblFillCol(sess_tbl, col, "New York", ny_color,  hi_ny,  lo_ny,  ts)
+        col += 1
+    if lon_on
+        tblFillCol(sess_tbl, col, "London",   lon_color, hi_lon, lo_lon, ts)
+        col += 1
+    if tok_on
+        tblFillCol(sess_tbl, col, "Tokyo",    tok_color, hi_tok, lo_tok, ts)
+        col += 1

@@ -78,3 +78,27 @@ a { color: inherit; text-decoration: none; }
   .topnav { flex-wrap: wrap; }
   .topnav .links { order: 3; width: 100%; overflow-x: auto; }
 }
+
+/* ---- single-page sections ---- */
+.section-anchor { scroll-margin-top: 68px; }
+.section-divider {
+  max-width: 980px; margin: 40px auto 28px; padding: 0 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.section-divider .line { flex: 1; height: 1px; background: var(--line-soft); }
+.section-divider .t {
+  font-family: "JetBrains Mono", monospace; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .12em; color: var(--mut-2); white-space: nowrap;
+}
+
+/* ---- TradingView chart ---- */
+.tvchart-wrap {
+  max-width: 980px; margin: 0 auto; padding: 20px 16px 0;
+}
+.tvchart-inner {
+  height: 520px; border: 1px solid var(--line-soft); border-radius: 10px; overflow: hidden;
+  background: var(--panel-2);
+}
+@media (max-width: 680px) {
+  .tvchart-inner { height: 380px; }
+}
