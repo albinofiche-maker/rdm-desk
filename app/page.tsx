@@ -50,7 +50,7 @@ const GATES: GateDef[] = [
   { id: "powerhours", label: "Within Powerhours", hint: "A hora atual cai dentro da tua janela definida — senão, morto.", phase: 1 },
   { id: "sweepLow", label: "Sellside swept FIRST (Asia/London/NY low)", hint: "O draw tem de ser tirado antes do SMT — nunca entres antes do sweep.", phase: 1, dir: "long", liveKey: "sweepLow" },
   { id: "sweepHigh", label: "Buyside swept FIRST (Asia/London/NY high)", hint: "O draw tem de ser tirado antes do SMT — nunca entres antes do sweep.", phase: 1, dir: "short", liveKey: "sweepHigh" },
-  { id: "sunriseZone", label: "Session zone reached (NY/London/Tokyo only)", hint: "Só contam zonas destas 3 sessões — Dubai, Rio etc. não têm base, ignora.", phase: 1, liveKey: "zoneTouched" },
+  { id: "sunriseZone", label: "Ryze Zone", hint: "Só contam zonas destas 3 sessões — Dubai, Rio etc. não têm base, ignora.", phase: 1, liveKey: "zoneTouched" },
 
   { id: "rsmt", label: "RSMT present", hint: "Válido se: só um ativo tapa a zona · OU os dois tapam mas em zonas diferentes · OU a mesma zona em dias diferentes. Só invalida se fechar através da zona.", phase: 2 },
   { id: "smt1m", label: "SMT valid on 1min", hint: "Mínimo exigido — mas sozinho não chega, tem de validar nos maiores.", phase: 2, liveKey: "smtBullish" },
@@ -448,6 +448,22 @@ export default function HomePage() {
             {visibleGates.filter((g) => g.phase === phaseNum).map((g) => {
               const isChecked = !!checked[g.id];
               const live = g.liveKey && liveState[g.liveKey] && Date.now() - liveState[g.liveKey].ts < 2 * 60 * 60 * 1000;
+              const isAuto = !!g.liveKey || g.id === "powerhours";
+
+              if (isAuto) {
+                return (
+                  <div key={g.id} className={"info-row auto-gate" + (g.optional ? " optional" : "")}>
+                    <span className={"dot " + (isChecked ? "clear" : "pending")}></span>
+                    <span className="txtwrap">
+                      <b>{g.label}</b>
+                      <span className="hint">{g.hint}</span>
+                    </span>
+                    {g.tag && <span className="tag">{g.tag}</span>}
+                    {live && <span className="tag live">live</span>}
+                  </div>
+                );
+              }
+
               return (
                 <label
                   key={g.id}
