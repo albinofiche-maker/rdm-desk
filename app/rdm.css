@@ -59,6 +59,10 @@
 .rdm-page .info-row b{font-weight:600;}
 .rdm-page .info-row .hint{display:block;font-size:11px;color:var(--mut);margin-top:2px;}
 .rdm-page .info-row .txtwrap{flex:1;}
+.rdm-page .info-row .tag{margin-left:auto;flex:0 0 auto;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dawn-deep);border:1px solid rgba(255,159,28,.3);border-radius:4px;padding:2px 5px;margin-top:1px;white-space:nowrap;}
+.rdm-page .info-row .tag.live{color:var(--teal);border-color:rgba(61,214,140,.35);}
+.rdm-page .info-row .tag.blocked{color:var(--ember);border-color:rgba(240,86,58,.4);}
 
 .rdm-page .clearance{position:relative;margin:20px 0 16px;border:1px solid var(--line);border-radius:14px;
   overflow:hidden;background:var(--panel-2);box-shadow:var(--shadow);}
