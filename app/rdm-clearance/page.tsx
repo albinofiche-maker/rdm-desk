@@ -19,25 +19,26 @@ interface GateDef {
 
 const GATES: GateDef[] = [
   { id: "powerhours", label: "Within Powerhours", hint: "A hora atual cai dentro da tua janela definida — senão, morto.", phase: 1 },
-  { id: "sunriseZone", label: "Sunrise Zone reached", hint: "Preço tocou a zona (ou está mesmo à frente dela).", phase: 1, liveKey: "zoneTouched" },
-  { id: "sweepLow", label: "Sweep of a key low", hint: "Sellside tirado — Asia low, London low ou PDL varrido na zona.", phase: 1, dir: "long", liveKey: "sweepLow" },
-  { id: "sweepHigh", label: "Sweep of a key high", hint: "Buyside tirado — Asia high, London high ou PDH varrido na zona.", phase: 1, dir: "short", liveKey: "sweepHigh" },
+  { id: "sweepLow", label: "Sellside swept FIRST (Asia/London/NY low)", hint: "O draw tem de ser tirado antes do SMT — nunca entres antes do sweep.", phase: 1, dir: "long", liveKey: "sweepLow" },
+  { id: "sweepHigh", label: "Buyside swept FIRST (Asia/London/NY high)", hint: "O draw tem de ser tirado antes do SMT — nunca entres antes do sweep.", phase: 1, dir: "short", liveKey: "sweepHigh" },
+  { id: "sunriseZone", label: "Session zone reached (NY/London/Tokyo only)", hint: "Só contam zonas destas 3 sessões — Dubai, Rio etc. não têm base, ignora.", phase: 1, liveKey: "zoneTouched" },
 
-  { id: "smtBullish", label: "Bullish SMT: NQ Lower Low · ES Higher Low", hint: "NQ imprime lower low enquanto ES imprime higher low.", phase: 2, dir: "long", liveKey: "smtBullish" },
-  { id: "smtBearish", label: "Bearish SMT: NQ Higher High · ES Lower High", hint: "NQ imprime higher high enquanto ES imprime lower high.", phase: 2, dir: "short", liveKey: "smtBearish" },
-  { id: "smtDouble", label: "5m SMT + 1m local SMT", hint: "5-min já mostra SMT, 1-min forma SMT local durante o toque na zona.", phase: 2, optional: true, tag: "A+" },
+  { id: "rsmt", label: "RSMT present", hint: "Válido se: só um ativo tapa a zona · OU os dois tapam mas em zonas diferentes · OU a mesma zona em dias diferentes. Só invalida se fechar através da zona.", phase: 2 },
+  { id: "smt1m", label: "SMT valid on 1min", hint: "Mínimo exigido — mas sozinho não chega, tem de validar nos maiores.", phase: 2, liveKey: "smtBullish" },
+  { id: "smt5m", label: "SMT valid on 5min", hint: "Confirma o 1min. Longs: NQ tira a low, ES falha = alta qualidade.", phase: 2 },
+  { id: "smt15m", label: "SMT valid on 15min", hint: "Os 3 juntos (1m+5m+15m) = setup A+. Shorts: NQ tira a high, ES falha = alta qualidade.", phase: 2, tag: "A+" },
 
   { id: "fvgBearishAbove", label: "Active bearish FVG above price", hint: "FVG bearish por preencher, formado na descida até à zona.", phase: 3, dir: "long", liveKey: "fvgBearishActive" },
-  { id: "closeAboveFvg", label: "1m candle CLOSES above the FVG top", hint: "Fecho acima da borda superior → mercado long. Espera o fecho.", phase: 3, dir: "long", liveKey: "closeAboveFvg" },
+  { id: "closeAboveFvg", label: "1min inversion CLOSES above the FVG top", hint: "Fecho de 1min (ou 30s) acima da borda superior = confirmação de entrada.", phase: 3, dir: "long", liveKey: "closeAboveFvg" },
   { id: "fvgBullishBelow", label: "Active bullish FVG below price", hint: "FVG bullish por preencher, formado na subida até à zona.", phase: 3, dir: "short", liveKey: "fvgBullishActive" },
-  { id: "closeBelowFvg", label: "1m candle CLOSES below the FVG bottom", hint: "Fecho abaixo da borda inferior → mercado short. Espera o fecho.", phase: 3, dir: "short", liveKey: "closeBelowFvg" },
+  { id: "closeBelowFvg", label: "1min inversion CLOSES below the FVG bottom", hint: "Fecho de 1min (ou 30s) abaixo da borda inferior = confirmação de entrada.", phase: 3, dir: "short", liveKey: "closeBelowFvg" },
 
   { id: "calm", label: "Calm — this is not revenge", hint: "Não zangado, não a perseguir o prejuízo. Senão: ecrã desligado.", phase: 4 },
-  { id: "notForced", label: "Not forced / not front-run", hint: "O setup veio até mim. Não inventei nada que não estava lá.", phase: 4 },
+  { id: "notForced", label: "Not forced / not front-run", hint: "O setup veio até mim, ES não foi contrariado. Não inventei nada que não estava lá.", phase: 4 },
 ];
 
 const PHASE_LABEL: Record<number, string> = {
-  1: "Context · Filter",
+  1: "Context · Draw on Liquidity",
   2: "RSMT · Confirmation",
   3: "iFVG · Execution",
   4: "State · Discipline",
@@ -154,7 +155,7 @@ export default function RdmClearancePage() {
     if (Object.keys(patch).length) setChecked((c) => ({ ...c, ...patch }));
   }, [liveState]);
 
-  // auto-check powerhours based on configured trading hours (NY) with a 90min window
+  // auto-check powerhours: 9:30 (ou 10:00 se há notícia hoje), 14:00, 20:00 NY
   useEffect(() => {
     const nyHour = Number(
       new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hour12: false }).format(new Date())
@@ -163,13 +164,16 @@ export default function RdmClearancePage() {
       new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", minute: "2-digit" }).format(new Date())
     );
     const nowH = nyHour + nyMin / 60;
-    const within = weekly.tradingHoursNY.some((h) => {
+    const todayIdx0 = (new Date().getDay() + 6) % 7;
+    const hasNews = todayIdx0 < 5 && weekly.days[todayIdx0].news !== "none";
+    const windows = [hasNews ? "10:00" : "09:30", weekly.tradingHoursNY[1] || "14:00", weekly.tradingHoursNY[2] || "20:00"];
+    const within = windows.some((h) => {
       const [hh, mm] = h.split(":").map(Number);
       const start = hh + mm / 60;
       return nowH >= start && nowH < start + 1.5;
     });
     setChecked((c) => ({ ...c, powerhours: within }));
-  }, [clock, weekly.tradingHoursNY]);
+  }, [clock, weekly.tradingHoursNY, weekly.days]);
 
   function toggle(id: string) {
     setChecked((c) => ({ ...c, [id]: !c[id] }));
@@ -198,7 +202,7 @@ export default function RdmClearancePage() {
   }, [cb, clock]);
 
   const allClear = totalCount > 0 && doneCount === totalCount && !breaker.broken;
-  const isAplus = visibleGates.some((g) => g.optional && checked[g.id]);
+  const isAplus = !!(checked.smt1m && checked.smt5m && checked.smt15m);
 
   function fmtClock(s: number) {
     const m = Math.floor(s / 60), ss = Math.floor(s % 60);
@@ -219,6 +223,15 @@ export default function RdmClearancePage() {
 
   const todayIdx = (new Date().getDay() + 6) % 7; // 0=Mon
   const todayComputed = todayIdx < 5 ? computeDay(weekly.days[todayIdx]) : null;
+  const todayHasNews = todayIdx < 5 && weekly.days[todayIdx].news !== "none";
+  const firstWindowNY = todayHasNews ? "10:00" : "09:30";
+
+  const nyHourNow = (() => {
+    const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hour12: false }).format(new Date()));
+    const m = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", minute: "2-digit" }).format(new Date()));
+    return h + m / 60;
+  })();
+  const inPremarket = nyHourNow >= 4 && nyHourNow < 9.5;
 
   if (!cb) return null;
 
@@ -245,18 +258,37 @@ export default function RdmClearancePage() {
       </div>
 
       <details className="precond" open>
-        <summary><span className="chev">›</span> Pre-Conditions · Day Filter</summary>
+        <summary><span className="chev">›</span> Day Filter · Notícias &amp; Sessão</summary>
         <div className="precond-list">
           <PreRow
             title="Not a no-news Monday"
             hint="Skip Mondays com news vazia, e 1-2 dias antes de FOMC/Powell."
             status={todayComputed ? (todayComputed.state === "no" ? "blocked" : "clear") : "pending"}
           />
-          <PreRow title="Not pre-market open" hint="Sem trading antes da abertura oficial — espera volume real." status="pending" />
+          <div className="info-row">
+            <span className={"dot " + (todayComputed ? (todayComputed.state === "no" ? "blocked" : "clear") : "pending")}></span>
+            <span className="txtwrap">
+              <b>Sessão de hoje: {firstWindowNY}, {weekly.tradingHoursNY[1] || "14:00"}, {weekly.tradingHoursNY[2] || "20:00"} (NY)</b>
+              <span className="hint">
+                {todayHasNews ? "Há notícia hoje — abertura só depois das 10:00." : "Sem notícia crítica hoje — abertura normal às 9:30."}
+              </span>
+            </span>
+          </div>
+        </div>
+      </details>
+
+      <details className="precond" open>
+        <summary><span className="chev">›</span> Pre-Conditions</summary>
+        <div className="precond-list">
+          <PreRow
+            title="Pre-market open"
+            hint="Sem trading antes da abertura oficial — espera volume real."
+            status={inPremarket ? "blocked" : "clear"}
+          />
           <PreRow title="London used PDA to sponsor overnight move" hint="London tem de usar o Previous Day Array a guiar o overnight." status="pending" />
           <PreRow
-            title="London did NOT take both Asia H and L"
-            hint="No trade se London varreu o Asia high E low."
+            title="London swept Asia high AND low?"
+            hint="Se sim → no trade. Se não → verde."
             status={
               liveState.londonSweptBothAsia && Date.now() - liveState.londonSweptBothAsia.ts < 24 * 60 * 60 * 1000
                 ? "blocked"
@@ -264,18 +296,14 @@ export default function RdmClearancePage() {
             }
           />
           <PreRow
-            title="NY premarket did NOT take out London H&L before 9:30"
-            hint="No trade se o premarket de NY limpa os dois extremos de London antes das 9:30."
+            title="NY premarket swept London H&L before 9:30?"
+            hint="Se sim → no trade. Se não → verde."
             status={
               liveState.nyPremarketClearedBothLondon && Date.now() - liveState.nyPremarketClearedBothLondon.ts < 24 * 60 * 60 * 1000
                 ? "blocked"
                 : "clear"
             }
           />
-          <PreRow title="Clear of 10am news" hint="Se há release às 10h, espera o print." status="pending" />
-          <PreRow title="Trading TO or FROM the DOL" hint="Setup a favor ou contra o teu Draw on Liquidity." status="pending" />
-          <PreRow title="Bias is clear" hint="Se o bias não é óbvio, não há trade aqui." status="pending" />
-          <PreRow title="Clean headspace" hint="Não sob efeito de nada, sem ansiedade, sem stress." status="pending" />
         </div>
       </details>
 
