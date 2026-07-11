@@ -13,6 +13,7 @@ const VALID_GATES: GateId[] = [
   "closeBelowFvg",
   "londonSweptBothAsia",
   "nyPremarketClearedBothLondon",
+  "zoneInvalidated",
 ];
 
 // TradingView Pine Script alert -> webhook. Configura o "Message" do alerta como JSON, ex:
