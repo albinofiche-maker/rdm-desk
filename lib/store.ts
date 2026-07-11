@@ -13,7 +13,8 @@ export type GateId =
   | "closeAboveFvg"
   | "closeBelowFvg"
   | "londonSweptBothAsia"
-  | "nyPremarketClearedBothLondon";
+  | "nyPremarketClearedBothLondon"
+  | "zoneInvalidated";
 
 export interface GateEvent {
   value: boolean;
