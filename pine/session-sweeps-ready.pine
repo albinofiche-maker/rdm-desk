@@ -1,0 +1,80 @@
+//@version=5
+indicator("RDM — Session Sweeps", overlay=true)
+
+// ---- Sessões (horário de Nova Iorque) ----
+asiaSession    = "1800-2400"
+londonSession  = "0200-0500"
+nyPreSession   = "0400-0930"
+
+inAsia   = not na(time(timeframe.period, asiaSession   + ":1234567", "America/New_York"))
+inLondon = not na(time(timeframe.period, londonSession + ":1234567", "America/New_York"))
+inNyPre  = not na(time(timeframe.period, nyPreSession  + ":1234567", "America/New_York"))
+
+// ---- Guarda highs/lows por sessão (reseta no início de cada sessão) ----
+var float asiaHigh = na
+var float asiaLow  = na
+var float londonHigh = na
+var float londonLow  = na
+var float nyPreHigh = na
+var float nyPreLow  = na
+
+asiaStart   = inAsia   and not inAsia[1]
+londonStart = inLondon and not inLondon[1]
+nyPreStart  = inNyPre  and not inNyPre[1]
+
+if asiaStart
+    asiaHigh := high
+    asiaLow  := low
+else if inAsia
+    asiaHigh := math.max(asiaHigh, high)
+    asiaLow  := math.min(asiaLow, low)
+
+if londonStart
+    londonHigh := high
+    londonLow  := low
+else if inLondon
+    londonHigh := math.max(londonHigh, high)
+    londonLow  := math.min(londonLow, low)
+
+if nyPreStart
+    nyPreHigh := high
+    nyPreLow  := low
+else if inNyPre
+    nyPreHigh := math.max(nyPreHigh, high)
+    nyPreLow  := math.min(nyPreLow, low)
+
+// ---- Deteta sweep dos DOIS lados (high e low) ----
+var bool londonTookAsiaHigh = false
+var bool londonTookAsiaLow  = false
+var bool nyTookLondonHigh   = false
+var bool nyTookLondonLow    = false
+
+if londonStart
+    londonTookAsiaHigh := false
+    londonTookAsiaLow  := false
+if inLondon and not na(asiaHigh)
+    if high > asiaHigh
+        londonTookAsiaHigh := true
+    if low < asiaLow
+        londonTookAsiaLow := true
+
+if nyPreStart
+    nyTookLondonHigh := false
+    nyTookLondonLow  := false
+if inNyPre and not na(londonHigh)
+    if high > londonHigh
+        nyTookLondonHigh := true
+    if low < londonLow
+        nyTookLondonLow := true
+
+londonSweptBoth = londonTookAsiaHigh and londonTookAsiaLow
+nyPreSweptBoth  = nyTookLondonHigh and nyTookLondonLow
+
+// ---- Alertas — dispara só na barra em que a condição passa a verdadeira ----
+alertcondition(londonSweptBoth and not londonSweptBoth[1], title="London sweep both Asia", message='{"secret":"MQmIuYTUi8fbRJQKRGJ21N_9LOMqCRlo","gate":"londonSweptBothAsia","value":true,"price":"{{close}}","symbol":"{{ticker}}"}')
+alertcondition(nyPreSweptBoth and not nyPreSweptBoth[1], title="NY premarket sweep both London", message='{"secret":"MQmIuYTUi8fbRJQKRGJ21N_9LOMqCRlo","gate":"nyPremarketClearedBothLondon","value":true,"price":"{{close}}","symbol":"{{ticker}}"}')
+
+plot(asiaHigh, "Asia High", color=color.orange, style=plot.style_stepline)
+plot(asiaLow, "Asia Low", color=color.orange, style=plot.style_stepline)
+plot(londonHigh, "London High", color=color.blue, style=plot.style_stepline)
+plot(londonLow, "London Low", color=color.blue, style=plot.style_stepline)
