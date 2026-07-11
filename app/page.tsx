@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./rdm.css";
 import "./weekly.css";
-import TVChart from "@/components/TVChart";
+import LWChart from "@/components/LWChart";
 import { GateId } from "@/lib/store";
 import {
   DAY_NAMES,
@@ -364,7 +364,7 @@ export default function HomePage() {
     <>
       {/* ===================== CHART ===================== */}
       <div id="chart" className="section-anchor">
-        <TVChart symbol="OANDA:NAS100USD" />
+        <LWChart symbol="MNQ" timeframe="5" />
       </div>
 
       {/* ===================== CHECKLIST ===================== */}

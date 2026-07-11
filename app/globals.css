@@ -93,7 +93,7 @@ a { color: inherit; text-decoration: none; }
 
 /* ---- TradingView chart ---- */
 .tvchart-wrap {
-  max-width: 980px; margin: 0 auto; padding: 20px 16px 0;
+  max-width: 980px; margin: 0 auto; padding: 20px 16px 0; position: relative;
 }
 .tvchart-inner {
   height: 520px; border: 1px solid var(--line-soft); border-radius: 10px; overflow: hidden;
