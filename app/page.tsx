@@ -364,7 +364,7 @@ export default function HomePage() {
     <>
       {/* ===================== CHART ===================== */}
       <div id="chart" className="section-anchor">
-        <TVChart symbol="CME_MINI:MNQ1!" />
+        <TVChart symbol="OANDA:NAS100USD" />
       </div>
 
       {/* ===================== CHECKLIST ===================== */}

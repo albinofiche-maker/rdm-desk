@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 
 const CONTAINER_ID = "tv_chart_rdm";
 
-export default function TVChart({ symbol = "CME_MINI:MNQ1!" }: { symbol?: string }) {
+export default function TVChart({ symbol = "OANDA:NAS100USD" }: { symbol?: string }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
