@@ -53,6 +53,11 @@ tbl_pos      = input.string("Bottom Right", "Posicao",
 tbl_txt_size = input.string("Small", "Tamanho do texto (tabela)",
      options=["Tiny","Small","Normal","Large","Huge"],                    group=grp_tbl)
 
+// ── WEBHOOK: enviar zona para o site (gráfico) ──
+grp_hook      = "WEBHOOK (site)"
+webhookSecret = input.string("", "Webhook secret", group=grp_hook)
+webhookSymbol = input.string("MNQ", "Símbolo enviado no payload", group=grp_hook)
+
 // ═══════════════════════════════════════════════════════════
 // 🔧 HELPERS
 // ═══════════════════════════════════════════════════════════
@@ -79,6 +84,14 @@ f_tblpos(s) =>
         "Top Right"   => position.top_right
         "Top Left"    => position.top_left
         => position.bottom_right
+
+f_sendZone(session, zh, zl, zt) =>
+    if barstate.isconfirmed
+        msg = '{"secret":"' + webhookSecret + '","symbol":"' + webhookSymbol +
+             '","session":"' + session + '","high":' + str.tostring(zh) +
+             ',"low":' + str.tostring(zl) + ',"time":' + str.tostring(zt) +
+             ',"daysShow":' + str.tostring(days_show) + '}'
+        alert(msg, alert.freq_once_per_bar_close)
 
 // ── NOAA / Jean Meeus ──────────────────────────────────────
 f_sunrise_min(lat, lon) =>
@@ -338,18 +351,24 @@ removeOld(bArr, lArr, lblArr, tArr, hiArr, loArr, tdnArr) =>
 if ny_on
     createZone(is_ny, ny_h, ny_l, ny_t, box_ny, lin_ny, lbl_ny, tim_ny, hi_ny, lo_ny, tdn_ny,
                ny_color, ny_txt_col, ny_brd_col, ny_brd_w)
+    if is_ny
+        f_sendZone("ny", not na(ny_h) ? ny_h : high, not na(ny_l) ? ny_l : low, not na(ny_t) ? ny_t : time)
     removeOld(box_ny, lin_ny, lbl_ny, tim_ny, hi_ny, lo_ny, tdn_ny)
     updateLabels(lbl_ny, hi_ny, lo_ny, tdn_ny)
 
 if lon_on
     createZone(is_lon, lon_h, lon_l, lon_t, box_lon, lin_lon, lbl_lon, tim_lon, hi_lon, lo_lon, tdn_lon,
                lon_color, lon_txt_col, lon_brd_col, lon_brd_w)
+    if is_lon
+        f_sendZone("london", not na(lon_h) ? lon_h : high, not na(lon_l) ? lon_l : low, not na(lon_t) ? lon_t : time)
     removeOld(box_lon, lin_lon, lbl_lon, tim_lon, hi_lon, lo_lon, tdn_lon)
     updateLabels(lbl_lon, hi_lon, lo_lon, tdn_lon)
 
 if tok_on
     createZone(is_tok, tok_h, tok_l, tok_t, box_tok, lin_tok, lbl_tok, tim_tok, hi_tok, lo_tok, tdn_tok,
                tok_color, tok_txt_col, tok_brd_col, tok_brd_w)
+    if is_tok
+        f_sendZone("tokyo", not na(tok_h) ? tok_h : high, not na(tok_l) ? tok_l : low, not na(tok_t) ? tok_t : time)
     removeOld(box_tok, lin_tok, lbl_tok, tim_tok, hi_tok, lo_tok, tdn_tok)
     updateLabels(lbl_tok, hi_tok, lo_tok, tdn_tok)
 
@@ -393,42 +412,17 @@ alertcondition(alert_ny_bot,  "New York — Rejeicao Fundo", "FODA: Rejeicao no 
 alertcondition(alert_tok_top or alert_tok_bot or alert_lon_top or alert_lon_bot or alert_ny_top or alert_ny_bot,
      "Qualquer Rejeicao", "FODA: Rejeicao numa zona de sessao")
 
-// ═══════════════════════════════════════════════════════════
-// ⛔ INVALIDAÇÃO POR FECHO
-// Regra do utilizador: um pavio que sai e volta NÃO invalida a zona —
-// só invalida se uma candle FECHAR fora dela. Reseta quando nasce zona nova.
-// ═══════════════════════════════════════════════════════════
+// ── INVALIDAÇÃO (só se uma candle FECHAR fora da zona — wick não conta) ──
+invalid_ny_top  = ny_on  and not na(last_hi_ny)  and close > last_hi_ny
+invalid_ny_bot  = ny_on  and not na(last_lo_ny)  and close < last_lo_ny
+invalid_lon_top = lon_on and not na(last_hi_lon) and close > last_hi_lon
+invalid_lon_bot = lon_on and not na(last_lo_lon) and close < last_lo_lon
+invalid_tok_top = tok_on and not na(last_hi_tok) and close > last_hi_tok
+invalid_tok_bot = tok_on and not na(last_lo_tok) and close < last_lo_tok
 
-var bool inv_tok = false
-var bool inv_lon = false
-var bool inv_ny  = false
-
-if is_tok
-    inv_tok := false
-if is_lon
-    inv_lon := false
-if is_ny
-    inv_ny := false
-
-invalidate_tok_top = tok_on and not na(last_hi_tok) and not inv_tok and close > last_hi_tok
-invalidate_tok_bot = tok_on and not na(last_lo_tok) and not inv_tok and close < last_lo_tok
-invalidate_lon_top = lon_on and not na(last_hi_lon) and not inv_lon and close > last_hi_lon
-invalidate_lon_bot = lon_on and not na(last_lo_lon) and not inv_lon and close < last_lo_lon
-invalidate_ny_top  = ny_on  and not na(last_hi_ny)  and not inv_ny  and close > last_hi_ny
-invalidate_ny_bot  = ny_on  and not na(last_lo_ny)  and not inv_ny  and close < last_lo_ny
-
-if invalidate_tok_top or invalidate_tok_bot
-    inv_tok := true
-if invalidate_lon_top or invalidate_lon_bot
-    inv_lon := true
-if invalidate_ny_top or invalidate_ny_bot
-    inv_ny := true
-
-alertcondition(invalidate_tok_top or invalidate_tok_bot, "Tokyo — Zona Invalidada (fecho)",     "FODA: Fecho fora da zona Tokyo — zona invalidada")
-alertcondition(invalidate_lon_top or invalidate_lon_bot, "London — Zona Invalidada (fecho)",    "FODA: Fecho fora da zona London — zona invalidada")
-alertcondition(invalidate_ny_top  or invalidate_ny_bot,  "New York — Zona Invalidada (fecho)",  "FODA: Fecho fora da zona New York — zona invalidada")
-alertcondition(invalidate_tok_top or invalidate_tok_bot or invalidate_lon_top or invalidate_lon_bot or invalidate_ny_top or invalidate_ny_bot,
-     "Qualquer Zona Invalidada (fecho)", "FODA: Fecho fora de uma zona de sessao — invalidacao")
+alertcondition(invalid_ny_top or invalid_ny_bot,   "New York — Zona Invalidada (fecho)", "FODA: fecho fora da zona New York")
+alertcondition(invalid_lon_top or invalid_lon_bot, "London — Zona Invalidada (fecho)",   "FODA: fecho fora da zona London")
+alertcondition(invalid_tok_top or invalid_tok_bot, "Tokyo — Zona Invalidada (fecho)",    "FODA: fecho fora da zona Tokyo")
 
 // ═══════════════════════════════════════════════════════════
 // ⭕ TOUCH CIRCLES — ticker actual
