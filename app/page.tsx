@@ -220,7 +220,12 @@ export default function HomePage() {
     const nowH = nyHour + nyMin / 60;
     const todayIdx0 = (new Date().getDay() + 6) % 7;
     const hasNews = todayIdx0 < 5 && weekly.days[todayIdx0].news !== "none";
-    const windows = [hasNews ? "10:00" : "09:30", weekly.tradingHoursNY[1] || "14:00", weekly.tradingHoursNY[2] || "20:00"];
+    const newsTimeToday = todayIdx0 < 5 ? weekly.days[todayIdx0].newsTime : "";
+    const windows = [
+      hasNews ? newsTimeToday || "10:00" : "09:30",
+      weekly.tradingHoursNY[1] || "14:00",
+      weekly.tradingHoursNY[2] || "20:00",
+    ];
     const within = windows.some((h) => {
       const [hh, mm] = h.split(":").map(Number);
       const start = hh + mm / 60;
@@ -279,7 +284,7 @@ export default function HomePage() {
   const isWeekday = todayIdx < 5;
   const todayComputed = isWeekday ? computeDay(weekly.days[todayIdx]) : null;
   const todayHasNews = isWeekday && weekly.days[todayIdx].news !== "none";
-  const firstWindowNY = todayHasNews ? "10:00" : "09:30";
+  const firstWindowNY = todayHasNews ? weekly.days[todayIdx].newsTime || "10:00" : "09:30";
 
   const nyHourNow = (() => {
     const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hour12: false }).format(new Date()));
@@ -613,6 +618,15 @@ export default function HomePage() {
                     </option>
                   ))}
                 </select>
+                {weekly.days[i].news !== "none" && weekly.days[i].news !== "holiday" && (
+                  <input
+                    type="time"
+                    className="news-time-input"
+                    value={weekly.days[i].newsTime || ""}
+                    onChange={(e) => updateDay(i, { newsTime: e.target.value })}
+                    title="Hora exata da notícia (NY) — opcional, default é 10:00"
+                  />
+                )}
               </div>
               <div className="mods">
                 {!isLast && (

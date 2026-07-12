@@ -37,6 +37,7 @@
 .wk-page .day-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
 .wk-page .day-name{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:15px;min-width:74px;color:var(--ink);}
 .wk-page select{flex:1;min-width:220px;background:var(--night);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-family:inherit;font-size:13px;}
+.wk-page .news-time-input{background:var(--night);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:8px 8px;font-family:inherit;font-size:13px;width:88px;}
 .wk-page .mods{margin-top:10px;display:flex;flex-wrap:wrap;gap:14px;}
 .wk-page .mod-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);cursor:pointer;user-select:none;}
 .wk-page .mod-toggle input{accent-color:var(--accent);cursor:pointer;}

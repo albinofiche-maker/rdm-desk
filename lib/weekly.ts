@@ -16,6 +16,7 @@ export type NewsType =
 
 export interface DayInput {
   news: NewsType;
+  newsTime?: string; // ex: "10:00" — hora exata da notícia (NY), opcional. Se vazio, usa-se o default de "10:00" do modelo.
   tomorrowCritical: boolean;
   tightRange: boolean;
   goodWeek: boolean;
@@ -31,7 +32,7 @@ export interface WeeklyState {
 export const DAY_NAMES = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
 
 export function defaultDay(): DayInput {
-  return { news: "none", tomorrowCritical: false, tightRange: false, goodWeek: false, choppyDump: false };
+  return { news: "none", newsTime: "", tomorrowCritical: false, tightRange: false, goodWeek: false, choppyDump: false };
 }
 
 export function isoWeekKey(d = new Date()): string {
@@ -213,6 +214,9 @@ export function computeDay(d: DayInput): DayComputed {
   let displayAction = base.action;
   if (levelOrder[stateLevel] < levelOrder[base.state]) {
     displayAction = stateLevel === "no" ? "NO TRADE" : actionLabels[stateLevel];
+  }
+  if (d.newsTime) {
+    displayAction = displayAction.replace("10:00", d.newsTime);
   }
 
   return { state: stateLevel, action: displayAction, reason: base.reason, extraNotes, shortLabel: actionLabels[stateLevel] };
